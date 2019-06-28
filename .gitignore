@@ -1,0 +1,4 @@
+dist
+semver
+go.mod
+go.sum

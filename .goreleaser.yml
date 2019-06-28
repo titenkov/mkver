@@ -1,0 +1,38 @@
+# This is an example goreleaser.yaml file with some sane defaults.
+# Make sure to check the documentation at http://goreleaser.com
+builds:
+  -
+    env:
+      - CGO_ENABLED=0
+    binary: semver
+
+archives:
+- replacements:
+    darwin: Darwin
+    linux: Linux
+    windows: Windows
+    386: i386
+    amd64: x86_64
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ .Tag }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+    - '^docs:'
+    - '^test:'
+brews:
+  -
+    name: semver
+    github:
+      owner: titenkov
+      name: homebrew-tap
+    folder: Formula
+    homepage: "https://github.com/titenkov/semver"
+    description: "Calculates semantic version based on the branch and version taken from one of the sources (environment variable, gradle version, package.json, etc.)"
+    dependencies:
+      - git
+    install: |
+      bin.install "semver"
