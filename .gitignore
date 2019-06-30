@@ -1,4 +1,4 @@
 dist
-semver
+mkver
 go.mod
 go.sum

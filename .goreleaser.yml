@@ -4,7 +4,7 @@ builds:
   -
     env:
       - CGO_ENABLED=0
-    binary: semver
+    binary: mkver
 
 archives:
 - replacements:
@@ -25,14 +25,14 @@ changelog:
     - '^test:'
 brews:
   -
-    name: semver
+    name: mkver
     github:
       owner: titenkov
       name: homebrew-tap
     folder: Formula
-    homepage: "https://github.com/titenkov/semver"
+    homepage: "https://github.com/titenkov/mkver"
     description: "Calculates semantic version based on the branch and version taken from one of the sources (environment variable, gradle version, package.json, etc.)"
     dependencies:
       - git
     install: |
-      bin.install "semver"
+      bin.install "mkver"

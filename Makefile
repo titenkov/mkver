@@ -2,7 +2,7 @@ clean:
 	rm -rf dist
 
 build: clean test
-	go build semver.go
+	go build mkver.go
 
 test: clean
 	go test .

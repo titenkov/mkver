@@ -10,31 +10,6 @@ import (
 	"github.com/urfave/cli"
 )
 
-var app = cli.NewApp()
-
-func info() {
-	app.Name = "Gradle git version calculator"
-	app.Usage = "Script for generating semantic version based on the version in gradle.properties and git branch"
-	app.Version = "0.0.1"
-}
-
-func commands() {
-	app.Commands = []cli.Command{
-		{
-			Name:    "version",
-			Aliases: []string{"v", "--version"},
-			Usage:   "Calculate semantic version",
-			Action: func(c *cli.Context) {
-				branch, _ := ResolveGitBranch()
-				version, _ := ResolveGradleVersion()
-
-				semanticVersion := CalculateSemanticVersion(branch, version)
-				fmt.Printf("%s", semanticVersion)
-			},
-		},
-	}
-}
-
 // CalculateSemanticVersion - calculates the semantic version depending on the gradle version (taken from the gradle.properties) and git branch
 //
 // Branch         gradle.version    semantic version
@@ -111,8 +86,27 @@ func getEnvVariable(key, fallback string) string {
 }
 
 func main() {
-	info()
-	commands()
+
+	var app = cli.NewApp()
+
+	app.Name = "mkver"
+	app.Usage = "Calculates semantic version based on the branch and version taken from one of the sources (environment variable, gradle version, package.json, etc.)"
+	app.Version = "0.2.0"
+
+	app.Commands = []cli.Command{
+		{
+			Name:    "version",
+			Aliases: []string{"v", "--version"},
+			Usage:   "Calculate semantic version",
+			Action: func(c *cli.Context) {
+				branch, _ := ResolveGitBranch()
+				version, _ := ResolveGradleVersion()
+
+				semanticVersion := CalculateSemanticVersion(branch, version)
+				fmt.Printf("%s", semanticVersion)
+			},
+		},
+	}
 
 	err := app.Run(os.Args)
 	if err != nil {
