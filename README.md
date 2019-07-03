@@ -1,7 +1,7 @@
 # 🤖 mkver
 [![Build Status][icon_build]][page_build]
 [![License][icon_license]](LICENSE)
-> Calculates semantic version based on the branch and version taken from one of the sources (environment variable, gradle version, package.json, etc.). Version is calculated and validated according to https://semver.org/.
+> Calculates application version by enriching the original one with various information
 
 ## Installation
 
@@ -16,30 +16,26 @@ $ brew install titenkov/tap/mkver
 ```bash
 $ mkver --help
 Usage:
-  mkver [command]
-
-Available Commands:
-  version     print calculated semantic version (default)
-  help        help about any command
+  mkver [flags]
 
 Flags:
-  -h, --help   help for mkver
-  -d, --debug  print debug into to console
+  -h, --help                help for mkver
 
-  --env        calculate semantic version based on the version taken from environment variable ($VERSION)
-  --gradle     calculate semantic version based on the version taken from gradle.properties
-  --npm        calculate semantic version based on the version taken from package.json
+  --env                     resolve version from env variable
+  --gradle                  resolve version from gradle properties
   
-  --git-sha    includes sha into semantic version
-  --git-ref    includes git ref into semantic version
-  --dirty
-  --dirty-timestamp
-  --build-num
-
-Use "mkver [command] --help" for more information about a command.
+  --git-sha                 include git sha into the version
+  --git-ref                 include git ref into the version
+  --git-ref-ignore          exclude branches using regexp from git ref calculation
+  --git-build-num           include build number into the version
+  --git-build-num-branch    specify branches using regexp for build num calculation
+  
 ```
 ## Examples
 
+```bash
+mkver --git-ref --git-sha --git-ref-ignore=^develop$ --git-ref-ignore=^master$ --git-ref-ignore=^release --git-build-num=rc. --git-build-num-branch=^release.+$ 
+```
 
 [icon_build]:      https://travis-ci.com/titenkov/mkver.svg?branch=master
 [icon_license]:    https://img.shields.io/badge/license-MIT-blue.svg
