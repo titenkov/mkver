@@ -9,13 +9,9 @@ go:
 # - http://docs.travis-ci.com/user/workers/standard-infrastructure/
 sudo: false
 
-# script always runs to completion (set +e). If we have linter issues AND a
-# failing test, we want to see both. Configure golangci-lint with a
-# .golangci.yml file at the top level of your repo.
 script:
   - make build
 
-# calls goreleaser
 deploy:
   - provider: script
     skip_cleanup: true
@@ -24,3 +20,10 @@ deploy:
       branch: master
       tags: true
       condition: $TRAVIS_OS_NAME = linux
+
+notifications:
+  email:
+    recipients:
+      - ci@titenkov.com
+    on_success: always
+    on_failure: always
