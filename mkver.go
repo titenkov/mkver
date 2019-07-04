@@ -13,6 +13,19 @@ import (
 	"github.com/urfave/cli"
 )
 
+// Config represents the set of arguments used for version calculation
+type Config struct {
+	env, gradle       string
+	gitSha, gitRef    bool
+	gitRefIgnore      []string
+	gitBuildNum       string
+	gitBuildNumBranch []string
+}
+
+var defaultConfigs = map[string]Config{
+	"app": Config{gitRef: true, gitRefIgnore: []string{"^develop$", "^release", "^hotfix"}, gitBuildNum: "rc.", gitBuildNumBranch: []string{"^release", "^hotfix"}},
+}
+
 func main() {
 
 	app := cli.NewApp()
@@ -29,11 +42,26 @@ func main() {
 		GitBuildNumBranchFlag,
 		GitRefFlag,
 		GitRefIgnoreFlag,
-		AutPilotFlag,
+		AutoPilotFlag,
 	}
 
 	app.Action = func(ctx *cli.Context) {
-		semanticVersion, err := Calculate(*ctx)
+		config := configure(*ctx)
+
+		// Resolve the version, that will be used as a ground for further calculations
+		// Version can be resolved from the env variable, gradle.properties or any other supported location
+		version, err := resolveVersion(&config)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Resolve the git branch
+		branch, err := resolveGitBranch(&config)
+		if err != nil || len(branch) == 0 {
+			branch = "unknown"
+		}
+
+		semanticVersion, err := Calculate(config, version, branch)
 
 		if err != nil {
 			log.Fatal(err)
@@ -54,39 +82,24 @@ func main() {
 }
 
 // Calculate produces application version by enriching the original one with meta-informaiton based on the provided flags
-func Calculate(ctx cli.Context) (string, error) {
+func Calculate(config Config, version string, branch string) (string, error) {
 	var versionBuilder strings.Builder
-
-	// Resolve the version, that will be used as a ground for further calculations
-	// Version can be resolved from the env variable, gradle.properties or any other supported location
-	version, err := resolveVersion(&ctx)
-
-	if err != nil {
-		return "", err
-	}
 
 	// Splits original version by "-" into 2 parts: root and ext. F.e. 1.0.0-SNAPSHOT => 1.0.0 (root) and SNAPSHOT (ext)
 	versionRoot, versionExt := resolveVersionRootAndExt(version)
 
 	versionBuilder.WriteString(versionRoot)
 
-	// Resolve the git branch
-	branch, err := resolveGitBranch(&ctx)
-
-	if err != nil || len(branch) == 0 {
-		branch = "unknown"
-	}
-
 	// Process git-ref. F.e. 1.0.0-SNAPSHOT on feature/x branch => 1.0.0-feature-x-SNAPSHOT
-	processGitRef(&ctx, branch, &versionBuilder)
+	processGitRef(&config, branch, &versionBuilder)
 
 	// Process git-build-num. Will add build number taken from env variable to the result version.
 	// F.e. 1.0.0 on the release/1.0.0 branch => 1.0.0-rcX (where x is a $BUILD_NUMBER env variable)
-	processGitBuildNum(&ctx, branch, &versionBuilder)
+	processGitBuildNum(&config, branch, &versionBuilder)
 
 	// Process git-sha. Will add git sha to the result version.
 	// F.e. 1.0.0-SNAPSHOT => 1.0.0-ea3op1-SNAPSHOT
-	processGitSha(&ctx, branch, &versionBuilder)
+	processGitSha(&config, branch, &versionBuilder)
 
 	// Appending back the version extension, which has been calculated together with a version root
 	if len(versionExt) > 0 {
@@ -100,42 +113,72 @@ func Calculate(ctx cli.Context) (string, error) {
 // UTILS
 //
 
+func configure(ctx cli.Context) Config {
+	var config Config
+
+	// If auto-pilot flag is present - apply one of the pre-defined configs
+	if ctx.IsSet(AutoPilotFlag.Name) {
+		name := ctx.String(AutoPilotFlag.Name)
+		config = defaultConfigs[name]
+	}
+
+	if ctx.IsSet(EnvFlag.Name) {
+		config.env = ctx.String(EnvFlag.Name)
+	}
+	if ctx.IsSet(GradleFlag.Name) {
+		config.gradle = ctx.String(GradleFlag.Name)
+	}
+	if ctx.IsSet(GitShaFlag.Name) {
+		config.gitSha = ctx.Bool(GitShaFlag.Name)
+	}
+	if ctx.IsSet(GitBuildNumFlag.Name) {
+		config.gitBuildNum = ctx.String(GitBuildNumFlag.Name)
+	}
+	if ctx.IsSet(GitBuildNumBranchFlag.Name) {
+		config.gitBuildNumBranch = ctx.StringSlice(GitBuildNumBranchFlag.Name)
+	}
+	if ctx.IsSet(GitRefFlag.Name) {
+		config.gitRef = ctx.Bool(GitRefFlag.Name)
+	}
+	if ctx.IsSet(GitRefIgnoreFlag.Name) {
+		config.gitRefIgnore = ctx.StringSlice(GitRefIgnoreFlag.Name)
+	}
+
+	return config
+}
+
 // Resolves original version from one of the sources
-func resolveVersion(ctx *cli.Context) (string, error) {
+func resolveVersion(cfg *Config) (string, error) {
 
 	// Resolve from the provided env variable
 	// In case, if "--env=.." flag is specified, resolve env variable with the provided name
-	if ctx.IsSet(EnvFlag.Name) {
-		envFlag := ctx.GlobalString(EnvFlag.Name)
+	if len(cfg.env) > 0 {
 
-		if len(envFlag) > 0 {
-			if val, found := os.LookupEnv(envFlag); found {
-				return val, nil
-			}
-
-			return "", fmt.Errorf("Failed to resolve version from env variable: $%s", envFlag)
+		if val, found := os.LookupEnv(cfg.env); found {
+			return val, nil
 		}
+
+		return "", fmt.Errorf("Failed to resolve version from env variable: $%s", cfg.env)
 	}
+
+	// Resolve from gradle
+	if len(cfg.gradle) > 0 {
+		if _, err := os.Stat(cfg.gradle); err == nil {
+			gradleProperties, err := readPropertiesFile(cfg.gradle)
+			if err != nil {
+				return "", fmt.Errorf("Failed to resolve version from gradle properties file: $%s", cfg.gradle)
+			}
+			return gradleProperties["version"], nil
+		}
+
+		return "", fmt.Errorf("Failed to resolve version from gradle properties file: $%s", cfg.gradle)
+	}
+
+	// Try to auto-detect the original version source
 
 	// Resolve from the default env variable (VERSION)
 	if val, found := os.LookupEnv("VERSION"); found {
 		return val, nil
-	}
-
-	// Resolve from gradle
-	if ctx.IsSet(GradleFlag.Name) {
-		gradleFlag := ctx.GlobalString(GradleFlag.Name)
-		if len(gradleFlag) > 0 {
-			if _, err := os.Stat(gradleFlag); err == nil {
-				gradleProperties, err := readPropertiesFile(gradleFlag)
-				if err != nil {
-					return "", fmt.Errorf("Failed to resolve version from gradle properties file: $%s", gradleFlag)
-				}
-				return gradleProperties["version"], nil
-			}
-
-			return "", fmt.Errorf("Failed to resolve version from gradle properties file: $%s", gradleFlag)
-		}
 	}
 
 	// Resolve from the default gradle.properties file
@@ -159,7 +202,7 @@ func resolveVersionRootAndExt(version string) (string, string) {
 	return version, ""
 }
 
-func resolveGitBranch(ctx *cli.Context) (string, error) {
+func resolveGitBranch(cfg *Config) (string, error) {
 	// Determine the git branch from env if running on CI, otherwise from git
 	if _, found := os.LookupEnv("BUILD_NUMBER"); found { // magic jenkins variable
 		if _, found := os.LookupEnv("CHANGE_ID"); found { // Are we building a PR?
@@ -177,19 +220,17 @@ func resolveGitBranch(ctx *cli.Context) (string, error) {
 	return strings.TrimSpace(string(out[:])), err
 }
 
-func processGitRef(ctx *cli.Context, branch string, versionBuilder *strings.Builder) {
+func processGitRef(cfg *Config, branch string, versionBuilder *strings.Builder) {
 
 	// Check if "--git-ref" flag is specified, otherwise - skip version processing
-	if !ctx.IsSet(GitRefFlag.Name) || !ctx.Bool(GitRefFlag.Name) {
+	if !cfg.gitRef {
 		return
 	}
 
 	var ignore bool
 
-	if ctx.IsSet(GitRefIgnoreFlag.Name) {
-		var ignoreBranches = ctx.StringSlice(GitRefIgnoreFlag.Name)
-
-		for _, b := range ignoreBranches {
+	if len(cfg.gitRefIgnore) > 0 {
+		for _, b := range cfg.gitRefIgnore {
 			if match, _ := regexp.MatchString(b, branch); match {
 				ignore = true
 			}
@@ -202,39 +243,42 @@ func processGitRef(ctx *cli.Context, branch string, versionBuilder *strings.Buil
 
 }
 
-func processGitBuildNum(ctx *cli.Context, branch string, versionBuilder *strings.Builder) {
-	if ctx.IsSet(GitBuildNumFlag.Name) {
-		var ignore = false
+func processGitBuildNum(cfg *Config, branch string, versionBuilder *strings.Builder) {
+	if len(cfg.gitBuildNum) == 0 {
+		return
+	}
 
-		if ctx.IsSet(GitBuildNumBranchFlag.Name) {
-			var branches = ctx.StringSlice(GitBuildNumBranchFlag.Name)
-			ignore = true
+	var ignore = false
 
-			for _, b := range branches {
-				if match, _ := regexp.MatchString(b, branch); match {
-					ignore = false
-				}
+	if len(cfg.gitBuildNumBranch) > 0 {
+		ignore = true
+		for _, b := range cfg.gitBuildNumBranch {
+			if match, _ := regexp.MatchString(b, branch); match {
+				ignore = false
 			}
-		}
-
-		if !ignore {
-			var buildNumber = "0"
-
-			if val, found := os.LookupEnv("BUILD_NUMBER"); found {
-				buildNumber = val
-			}
-
-			versionBuilder.WriteString("-" + ctx.String(GitBuildNumFlag.Name) + buildNumber)
 		}
 	}
+
+	if !ignore {
+		var buildNumber = "0"
+
+		if val, found := os.LookupEnv("BUILD_NUMBER"); found {
+			buildNumber = val
+		}
+
+		versionBuilder.WriteString("-" + cfg.gitBuildNum + buildNumber)
+	}
+
 }
 
-func processGitSha(ctx *cli.Context, branch string, versionBuilder *strings.Builder) {
-	if ctx.IsSet(GitShaFlag.Name) && ctx.Bool(GitShaFlag.Name) {
-		out, _ := exec.Command("bash", "-c", "git rev-parse --short=6 HEAD 2> /dev/null  || echo 'unknown'").Output()
-		sha := strings.TrimSpace(string(out[:]))
-		versionBuilder.WriteString("-" + sha)
+func processGitSha(cfg *Config, branch string, versionBuilder *strings.Builder) {
+	if !cfg.gitSha {
+		return
 	}
+
+	out, _ := exec.Command("bash", "-c", "git rev-parse --short=6 HEAD 2> /dev/null  || echo 'unknown'").Output()
+	sha := strings.TrimSpace(string(out[:]))
+	versionBuilder.WriteString("-" + sha)
 }
 
 func readPropertiesFile(filename string) (map[string]string, error) {

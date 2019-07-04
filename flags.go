@@ -119,9 +119,9 @@ var GitRefIgnoreFlag = cli.StringSliceFlag{
 // 	Usage: "Include timestamp into the version",
 // }
 
-// AutPilotFlag allows to use one of the predefined configs
+// AutoPilotFlag allows to use one of the predefined configs
 // F.e. --auto-pilot=app === --git-ref --git-build-num --dirty --dirty-timestamp
-var AutPilotFlag = cli.StringFlag{
+var AutoPilotFlag = cli.StringFlag{
 	Name:  "auto-pilot",
 	Value: "app",
 	Usage: "Use pre-defined configuration",
