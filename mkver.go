@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/titenkov/mkver/flags"
 	"github.com/urfave/cli"
 )
 
@@ -20,17 +19,17 @@ func main() {
 
 	app.Name = "mkver"
 	app.Usage = "Calculates application version by enriching the original one with various information"
-	app.Version = "0.3.0"
+	app.Version = "0.2.0"
 	app.Commands = nil
 	app.Flags = []cli.Flag{
-		flags.EnvFlag,
-		flags.GradleFlag,
-		flags.GitShaFlag,
-		flags.GitBuildNumFlag,
-		flags.GitBuildNumBranchFlag,
-		flags.GitRefFlag,
-		flags.GitRefIgnoreFlag,
-		flags.AutPilotFlag,
+		EnvFlag,
+		GradleFlag,
+		GitShaFlag,
+		GitBuildNumFlag,
+		GitBuildNumBranchFlag,
+		GitRefFlag,
+		GitRefIgnoreFlag,
+		AutPilotFlag,
 	}
 
 	app.Action = func(ctx *cli.Context) {
@@ -106,8 +105,8 @@ func resolveVersion(ctx *cli.Context) (string, error) {
 
 	// Resolve from the provided env variable
 	// In case, if "--env=.." flag is specified, resolve env variable with the provided name
-	if ctx.IsSet(flags.EnvFlag.Name) {
-		envFlag := ctx.GlobalString(flags.EnvFlag.Name)
+	if ctx.IsSet(EnvFlag.Name) {
+		envFlag := ctx.GlobalString(EnvFlag.Name)
 
 		if len(envFlag) > 0 {
 			if val, found := os.LookupEnv(envFlag); found {
@@ -124,8 +123,8 @@ func resolveVersion(ctx *cli.Context) (string, error) {
 	}
 
 	// Resolve from gradle
-	if ctx.IsSet(flags.GradleFlag.Name) {
-		gradleFlag := ctx.GlobalString(flags.GradleFlag.Name)
+	if ctx.IsSet(GradleFlag.Name) {
+		gradleFlag := ctx.GlobalString(GradleFlag.Name)
 		if len(gradleFlag) > 0 {
 			if _, err := os.Stat(gradleFlag); err == nil {
 				gradleProperties, err := readPropertiesFile(gradleFlag)
@@ -181,14 +180,14 @@ func resolveGitBranch(ctx *cli.Context) (string, error) {
 func processGitRef(ctx *cli.Context, branch string, versionBuilder *strings.Builder) {
 
 	// Check if "--git-ref" flag is specified, otherwise - skip version processing
-	if !ctx.IsSet(flags.GitRefFlag.Name) || !ctx.Bool(flags.GitRefFlag.Name) {
+	if !ctx.IsSet(GitRefFlag.Name) || !ctx.Bool(GitRefFlag.Name) {
 		return
 	}
 
 	var ignore bool
 
-	if ctx.IsSet(flags.GitRefIgnoreFlag.Name) {
-		var ignoreBranches = ctx.StringSlice(flags.GitRefIgnoreFlag.Name)
+	if ctx.IsSet(GitRefIgnoreFlag.Name) {
+		var ignoreBranches = ctx.StringSlice(GitRefIgnoreFlag.Name)
 
 		for _, b := range ignoreBranches {
 			if match, _ := regexp.MatchString(b, branch); match {
@@ -204,11 +203,11 @@ func processGitRef(ctx *cli.Context, branch string, versionBuilder *strings.Buil
 }
 
 func processGitBuildNum(ctx *cli.Context, branch string, versionBuilder *strings.Builder) {
-	if ctx.IsSet(flags.GitBuildNumFlag.Name) {
+	if ctx.IsSet(GitBuildNumFlag.Name) {
 		var ignore = false
 
-		if ctx.IsSet(flags.GitBuildNumBranchFlag.Name) {
-			var branches = ctx.StringSlice(flags.GitBuildNumBranchFlag.Name)
+		if ctx.IsSet(GitBuildNumBranchFlag.Name) {
+			var branches = ctx.StringSlice(GitBuildNumBranchFlag.Name)
 			ignore = true
 
 			for _, b := range branches {
@@ -225,13 +224,13 @@ func processGitBuildNum(ctx *cli.Context, branch string, versionBuilder *strings
 				buildNumber = val
 			}
 
-			versionBuilder.WriteString("-" + ctx.String(flags.GitBuildNumFlag.Name) + buildNumber)
+			versionBuilder.WriteString("-" + ctx.String(GitBuildNumFlag.Name) + buildNumber)
 		}
 	}
 }
 
 func processGitSha(ctx *cli.Context, branch string, versionBuilder *strings.Builder) {
-	if ctx.IsSet(flags.GitShaFlag.Name) && ctx.Bool(flags.GitShaFlag.Name) {
+	if ctx.IsSet(GitShaFlag.Name) && ctx.Bool(GitShaFlag.Name) {
 		out, _ := exec.Command("bash", "-c", "git rev-parse --short=6 HEAD 2> /dev/null  || echo 'unknown'").Output()
 		sha := strings.TrimSpace(string(out[:]))
 		versionBuilder.WriteString("-" + sha)
