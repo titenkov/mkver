@@ -1,4 +1,4 @@
-package flags
+package main
 
 import (
 	"github.com/urfave/cli"
