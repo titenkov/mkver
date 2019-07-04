@@ -1,11 +1,15 @@
+.PHONY: clean
 clean:
 	rm -rf dist
 
-build: clean test
-	go build mkver.go
+.PHONY: setup
+setup:
+	go get
 
-test: clean
+.PHONY: build
+build: clean setup
+	go build
+
+.PHONY: test
+test:
 	go test .
-
-release:
-	goreleaser

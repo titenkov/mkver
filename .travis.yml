@@ -1,20 +1,13 @@
 language: go
 
-dist: trusty
-
-env:
-  - GO111MODULE=on
-
-go: 
+go:
   - 1.12.x
 
-# Only clone the most recent commit.
-git:
-  depth: 1
-
-# Skip the install step. Don't `go get` dependencies. Only build with the code
-# in vendor/
-install: true
+# Setting sudo access to false will let Travis CI use containers rather than
+# VMs to run the tests. For more details see:
+# - http://docs.travis-ci.com/user/workers/container-based-infrastructure/
+# - http://docs.travis-ci.com/user/workers/standard-infrastructure/
+sudo: false
 
 # script always runs to completion (set +e). If we have linter issues AND a
 # failing test, we want to see both. Configure golangci-lint with a
