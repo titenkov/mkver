@@ -22,8 +22,12 @@ type Config struct {
 	gitBuildNumBranch []string
 }
 
-var defaultConfigs = map[string]Config{
-	"app": Config{gitRef: true, gitRefIgnore: []string{"^develop$", "^release", "^hotfix"}, gitBuildNum: "rc.", gitBuildNumBranch: []string{"^release", "^hotfix"}},
+var execCommand = exec.Command
+
+// DefaultConfigs contain pre-configured short-cuts
+var DefaultConfigs = map[string]Config{
+	"app":    Config{gitRef: true, gitRefIgnore: []string{"^develop$", "^master$", "^release", "^hotfix"}, gitBuildNum: "rc.", gitBuildNumBranch: []string{"^release", "^hotfix"}},
+	"docker": Config{gitSha: true, gitRef: true, gitRefIgnore: []string{"^develop$", "^master$", "^release", "^hotfix"}, gitBuildNum: "rc.", gitBuildNumBranch: []string{"^release", "^hotfix"}},
 }
 
 func main() {
@@ -32,7 +36,7 @@ func main() {
 
 	app.Name = "mkver"
 	app.Usage = "Calculates application version by enriching the original one with various information"
-	app.Version = "0.2.0"
+	app.Version = "0.3.0"
 	app.Commands = nil
 	app.Flags = []cli.Flag{
 		EnvFlag,
@@ -119,7 +123,7 @@ func configure(ctx cli.Context) Config {
 	// If auto-pilot flag is present - apply one of the pre-defined configs
 	if ctx.IsSet(AutoPilotFlag.Name) {
 		name := ctx.String(AutoPilotFlag.Name)
-		config = defaultConfigs[name]
+		config = DefaultConfigs[name]
 	}
 
 	if ctx.IsSet(EnvFlag.Name) {
@@ -216,7 +220,7 @@ func resolveGitBranch(cfg *Config) (string, error) {
 
 	// Not a CI build
 	//TODO: change to lib?
-	out, err := exec.Command("bash", "-c", "git rev-parse --abbrev-ref HEAD 2> /dev/null  || echo 'unknown'").Output()
+	out, err := execCommand("bash", "-c", "git rev-parse --abbrev-ref HEAD 2> /dev/null  || echo 'unknown'").Output()
 	return strings.TrimSpace(string(out[:])), err
 }
 
@@ -276,7 +280,7 @@ func processGitSha(cfg *Config, branch string, versionBuilder *strings.Builder) 
 		return
 	}
 
-	out, _ := exec.Command("bash", "-c", "git rev-parse --short=6 HEAD 2> /dev/null  || echo 'unknown'").Output()
+	out, _ := execCommand("bash", "-c", "git rev-parse --short=6 HEAD 2> /dev/null  || echo 'unknown'").Output()
 	sha := strings.TrimSpace(string(out[:]))
 	versionBuilder.WriteString("-" + sha)
 }
