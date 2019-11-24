@@ -15,6 +15,7 @@ import (
 
 // Config represents the set of arguments used for version calculation
 type Config struct {
+	profile           string
 	env, gradle       string
 	gitSha, gitRef    bool
 	gitRefIgnore      []string
@@ -26,8 +27,10 @@ var execCommand = exec.Command
 
 // DefaultConfigs contain pre-configured short-cuts
 var DefaultConfigs = map[string]Config{
-	"app":    Config{gitRef: true, gitRefIgnore: []string{"^develop$", "^master$", "^release", "^hotfix"}, gitBuildNum: "rc.", gitBuildNumBranch: []string{"^release", "^hotfix"}},
-	"docker": Config{gitSha: true, gitRef: true, gitRefIgnore: []string{"^develop$", "^master$", "^release", "^hotfix"}, gitBuildNum: "rc.", gitBuildNumBranch: []string{"^release", "^hotfix"}},
+	"gradle": Config{gitRef: true, gitRefIgnore: []string{"^develop$", "^master$", "^release", "^hotfix"}, gitBuildNum: "b", gitBuildNumBranch: []string{"^release", "^hotfix", "master"}},
+	"npm":    Config{gitRef: true, gitRefIgnore: []string{"^develop$", "^master$", "^release", "^hotfix"}},
+	"docker": Config{profile: "docker", gitSha: true, gitRef: true, gitRefIgnore: []string{"^develop$", "^master$", "^release", "^hotfix"}, gitBuildNum: "b"},
+	"helm":   Config{gitSha: true, gitRef: true, gitRefIgnore: []string{"^develop$", "^master$", "^release", "^hotfix"}, gitBuildNum: "b"},
 }
 
 func main() {
@@ -46,7 +49,8 @@ func main() {
 		GitBuildNumBranchFlag,
 		GitRefFlag,
 		GitRefIgnoreFlag,
-		AutoPilotFlag,
+		SnapshotFlag,
+		ForFlag,
 	}
 
 	app.Action = func(ctx *cli.Context) {
@@ -106,7 +110,7 @@ func Calculate(config Config, version string, branch string) (string, error) {
 	processGitSha(&config, branch, &versionBuilder)
 
 	// Appending back the version extension, which has been calculated together with a version root
-	if len(versionExt) > 0 {
+	if len(versionExt) > 0 && config.profile == "gradle" {
 		versionBuilder.WriteString("-" + versionExt)
 	}
 
@@ -120,9 +124,9 @@ func Calculate(config Config, version string, branch string) (string, error) {
 func configure(ctx cli.Context) Config {
 	var config Config
 
-	// If auto-pilot flag is present - apply one of the pre-defined configs
-	if ctx.IsSet(AutoPilotFlag.Name) {
-		name := ctx.String(AutoPilotFlag.Name)
+	// If "for" flag is present - apply one of the pre-defined configs
+	if ctx.IsSet(ForFlag.Name) {
+		name := ctx.String(ForFlag.Name)
 		config = DefaultConfigs[name]
 	}
 
@@ -282,7 +286,11 @@ func processGitSha(cfg *Config, branch string, versionBuilder *strings.Builder) 
 
 	out, _ := execCommand("bash", "-c", "git rev-parse --short=6 HEAD 2> /dev/null  || echo 'unknown'").Output()
 	sha := strings.TrimSpace(string(out[:]))
-	versionBuilder.WriteString("-" + sha)
+	if "docker" == cfg.profile {
+		versionBuilder.WriteString("+git." + sha)
+	} else {
+		versionBuilder.WriteString("-" + sha)
+	}
 }
 
 func readPropertiesFile(filename string) (map[string]string, error) {

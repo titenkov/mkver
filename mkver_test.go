@@ -28,60 +28,86 @@ func TestHelperProcess(t *testing.T) {
 }
 
 var tests = []struct {
+	name     string
 	config   Config
 	version  string
 	branch   string
 	expected string
 	err      error
 }{
-	{Config{}, "develop", "1.0.0-SNAPSHOT", "1.0.0-SNAPSHOT", nil},
-	{Config{}, "master", "1.0.0", "1.0.0", nil},
+	{"default", Config{}, "develop", "1.0.0-SNAPSHOT", "1.0.0-SNAPSHOT", nil},
+	{"default", Config{}, "master", "1.0.0", "1.0.0", nil},
 
-	// --git-sha tests
-	{Config{gitSha: true}, "develop", "1.0.0-SNAPSHOT", "1.0.0-1a2b3c-SNAPSHOT", nil},
-	{Config{gitSha: true}, "master", "1.0.0", "1.0.0-1a2b3c", nil},
+	// --git-sha
+	{"--git-sha", Config{gitSha: true}, "develop", "1.0.0-SNAPSHOT", "1.0.0-1a2b3c-SNAPSHOT", nil},
+	{"--git-sha", Config{gitSha: true}, "master", "1.0.0", "1.0.0-1a2b3c", nil},
 
 	// --git-ref tests
-	{Config{gitRef: true}, "develop", "1.0.0-SNAPSHOT", "1.0.0-develop-SNAPSHOT", nil},
-	{Config{gitRef: true}, "develop", "1.0.0", "1.0.0-develop", nil},
-	{Config{gitRef: true}, "defect/X", "1.0.0-SNAPSHOT", "1.0.0-defect-x-SNAPSHOT", nil},
-	{Config{gitRef: true}, "defect/X", "1.0.0", "1.0.0-defect-x", nil},
-	{Config{gitRef: true}, "feature/TEST-123", "1.0.0", "1.0.0-feature-test-123", nil},
+	{"--git-ref", Config{gitRef: true}, "develop", "1.0.0-SNAPSHOT", "1.0.0-develop-SNAPSHOT", nil},
+	{"--git-ref", Config{gitRef: true}, "develop", "1.0.0", "1.0.0-develop", nil},
+	{"--git-ref", Config{gitRef: true}, "defect/X", "1.0.0-SNAPSHOT", "1.0.0-defect-x-SNAPSHOT", nil},
+	{"--git-ref", Config{gitRef: true}, "defect/X", "1.0.0", "1.0.0-defect-x", nil},
+	{"--git-ref", Config{gitRef: true}, "feature/TEST-123", "1.0.0", "1.0.0-feature-test-123", nil},
 
 	// --git-ref-ignore tests
-	{Config{gitRef: true, gitRefIgnore: []string{"^develop$"}}, "develop", "1.0.0", "1.0.0", nil},
-	{Config{gitRef: true, gitRefIgnore: []string{"^release"}}, "release/1.0.0", "1.0.0", "1.0.0", nil},
-	{Config{gitRef: true, gitRefIgnore: []string{"^release"}}, "feature/x", "1.0.0", "1.0.0-feature-x", nil},
+	{"--git-ref-ignore", Config{gitRef: true, gitRefIgnore: []string{"^develop$"}}, "develop", "1.0.0", "1.0.0", nil},
+	{"--git-ref-ignore", Config{gitRef: true, gitRefIgnore: []string{"^release"}}, "release/1.0.0", "1.0.0", "1.0.0", nil},
+	{"--git-ref-ignore", Config{gitRef: true, gitRefIgnore: []string{"^release"}}, "feature/x", "1.0.0", "1.0.0-feature-x", nil},
 
 	// --git-build-num tests
-	{Config{gitBuildNum: "rc."}, "develop", "1.0.0-SNAPSHOT", "1.0.0-rc.13-SNAPSHOT", nil},
-	{Config{gitBuildNum: "b"}, "develop", "1.0.0", "1.0.0-b13", nil},
-	{Config{gitBuildNum: "rc."}, "release/1.0.0", "1.0.0", "1.0.0-rc.13", nil},
+	{"--git-build-num", Config{gitBuildNum: "rc."}, "develop", "1.0.0-SNAPSHOT", "1.0.0-rc.13-SNAPSHOT", nil},
+	{"--git-build-num", Config{gitBuildNum: "b"}, "develop", "1.0.0", "1.0.0-b13", nil},
+	{"--git-build-num", Config{gitBuildNum: "rc."}, "release/1.0.0", "1.0.0", "1.0.0-rc.13", nil},
 
 	// --git-build-num-branch tests
-	{Config{gitBuildNum: "rc.", gitBuildNumBranch: []string{"^release", "^hotfix"}}, "release/1.0.0", "1.0.0-SNAPSHOT", "1.0.0-rc.13-SNAPSHOT", nil},
-	{Config{gitBuildNum: "rc.", gitBuildNumBranch: []string{"^release", "^hotfix"}}, "develop", "1.0.0-SNAPSHOT", "1.0.0-SNAPSHOT", nil},
+	{"--git-build-num-branch", Config{gitBuildNum: "rc.", gitBuildNumBranch: []string{"^release", "^hotfix"}}, "release/1.0.0", "1.0.0-SNAPSHOT", "1.0.0-rc.13-SNAPSHOT", nil},
+	{"--git-build-num-branch", Config{gitBuildNum: "rc.", gitBuildNumBranch: []string{"^release", "^hotfix"}}, "develop", "1.0.0-SNAPSHOT", "1.0.0-SNAPSHOT", nil},
 
-	// --git-auto-pilot=app tests
-	{DefaultConfigs["app"], "develop", "1.0.0-SNAPSHOT", "1.0.0-SNAPSHOT", nil},
-	{DefaultConfigs["app"], "develop-x", "1.0.0-SNAPSHOT", "1.0.0-develop-x-SNAPSHOT", nil},
-	{DefaultConfigs["app"], "feature/x", "1.0.0-SNAPSHOT", "1.0.0-feature-x-SNAPSHOT", nil},
-	{DefaultConfigs["app"], "defect/XYZ-123", "1.0.0-SNAPSHOT", "1.0.0-defect-xyz-123-SNAPSHOT", nil},
-	{DefaultConfigs["app"], "release/1.0.0", "1.0.0", "1.0.0-rc.13", nil},
-	{DefaultConfigs["app"], "hotfix/1.1.0", "1.1.0", "1.1.0-rc.13", nil},
-	{DefaultConfigs["app"], "master", "1.0.0", "1.0.0", nil},
+	//
+	// Profiles
+	//
 
-	// --git-auto-pilot=docker tests
-	{DefaultConfigs["docker"], "develop", "1.0.0-SNAPSHOT", "1.0.0-1a2b3c-SNAPSHOT", nil},
-	{DefaultConfigs["docker"], "develop-x", "1.0.0-SNAPSHOT", "1.0.0-develop-x-1a2b3c-SNAPSHOT", nil},
-	{DefaultConfigs["docker"], "feature/x", "1.0.0-SNAPSHOT", "1.0.0-feature-x-1a2b3c-SNAPSHOT", nil},
-	{DefaultConfigs["docker"], "defect/XYZ-123", "1.0.0-SNAPSHOT", "1.0.0-defect-xyz-123-1a2b3c-SNAPSHOT", nil},
-	{DefaultConfigs["docker"], "release/1.0.0", "1.0.0", "1.0.0-rc.13-1a2b3c", nil},
-	{DefaultConfigs["docker"], "hotfix/1.1.0", "1.1.0", "1.1.0-rc.13-1a2b3c", nil},
-	{DefaultConfigs["docker"], "master", "1.0.0", "1.0.0-1a2b3c", nil},
+	// --for=gradle
+	// It's important to support SNAPSHOT versioning for Java artifacts
+	// {"--for=gradle", DefaultConfigs["gradle"], "develop", "1.0.0-SNAPSHOT", "1.0.0-SNAPSHOT", nil},
+	// {"--for=gradle", DefaultConfigs["gradle"], "develop-x", "1.0.0-SNAPSHOT", "1.0.0-develop-x-SNAPSHOT", nil},
+	// {"--for=gradle", DefaultConfigs["gradle"], "feature/x", "1.0.0-SNAPSHOT", "1.0.0-feature-x-SNAPSHOT", nil},
+	// {"--for=gradle", DefaultConfigs["gradle"], "defect/XYZ-123", "1.0.0-SNAPSHOT", "1.0.0-defect-xyz-123-SNAPSHOT", nil},
+	// {"--for=gradle", DefaultConfigs["gradle"], "defect/XYZ-123", "1.0.0", "1.0.0-defect-xyz-123-SNAPSHOT", nil}, // FAIL: Should probably be a snapshot?
+	// {"--for=gradle", DefaultConfigs["gradle"], "release/1.0.0", "1.0.0", "1.0.0-b13", nil},
+	// {"--for=gradle", DefaultConfigs["gradle"], "hotfix/1.1.0", "1.1.0", "1.1.0-b13", nil},
+	// {"--for=gradle", DefaultConfigs["gradle"], "master", "1.0.0", "1.0.0-b13", nil},
+
+	// --for=npm
+	// {"--for=npm", DefaultConfigs["npm"], "develop", "1.0.0", "1.0.0", nil},
+	// {"--for=npm", DefaultConfigs["npm"], "develop-x", "1.0.0", "1.0.0-develop-x", nil},
+	// {"--for=npm", DefaultConfigs["npm"], "feature/x", "1.0.0", "1.0.0-feature-x", nil},
+	// {"--for=npm", DefaultConfigs["npm"], "defect/XYZ-123", "1.0.0", "1.0.0-defect-xyz-123", nil},
+	// {"--for=npm", DefaultConfigs["npm"], "release/1.0.0", "1.0.0", "1.0.0", nil},
+	// {"--for=npm", DefaultConfigs["npm"], "hotfix/1.1.0", "1.1.0", "1.1.0", nil},
+	// {"--for=npm", DefaultConfigs["npm"], "master", "1.0.0", "1.0.0", nil},
+
+	// --for=docker tests
+	{"--for=docker", DefaultConfigs["docker"], "develop", "1.0.0", "1.0.0-b13+git.1a2b3c", nil},
+	{"--for=docker", DefaultConfigs["docker"], "develop", "1.0.0-SNAPSHOT", "1.0.0-b13+git.1a2b3c", nil}, // Should ignore snapshot suffix
+	{"--for=docker", DefaultConfigs["docker"], "develop-x", "1.0.0", "1.0.0-develop-x-b13+git.1a2b3c", nil},
+	{"--for=docker", DefaultConfigs["docker"], "feature/x", "1.0.0-SNAPSHOT", "1.0.0-feature-x-b13+git.1a2b3c", nil},
+	{"--for=docker", DefaultConfigs["docker"], "defect/XYZ-123", "1.0.0-SNAPSHOT", "1.0.0-defect-xyz-123-1a2b3c-SNAPSHOT", nil},
+	{"--for=docker", DefaultConfigs["docker"], "release/1.0.0", "1.0.0", "1.0.0-rc.13-1a2b3c", nil},
+	{"--for=docker", DefaultConfigs["docker"], "hotfix/1.1.0", "1.1.0", "1.1.0-rc.13-1a2b3c", nil},
+	{"--for=docker", DefaultConfigs["docker"], "master", "1.0.0", "1.0.0-1a2b3c", nil},
+
+	// --for=helm tests
+	// {"--for=helm", DefaultConfigs["docker"], "develop", "1.0.0-SNAPSHOT", "1.0.0-1a2b3c-SNAPSHOT", nil},
+	// {"--for=helm", DefaultConfigs["docker"], "develop-x", "1.0.0-SNAPSHOT", "1.0.0-develop-x-1a2b3c-SNAPSHOT", nil},
+	// {"--for=helm", DefaultConfigs["docker"], "feature/x", "1.0.0-SNAPSHOT", "1.0.0-feature-x-1a2b3c-SNAPSHOT", nil},
+	// {"--for=helm", DefaultConfigs["docker"], "defect/XYZ-123", "1.0.0-SNAPSHOT", "1.0.0-defect-xyz-123-1a2b3c-SNAPSHOT", nil},
+	// {"--for=helm", DefaultConfigs["docker"], "release/1.0.0", "1.0.0", "1.0.0-rc.13-1a2b3c", nil},
+	// {"--for=helm", DefaultConfigs["docker"], "hotfix/1.1.0", "1.1.0", "1.1.0-rc.13-1a2b3c", nil},
+	// {"--for=helm", DefaultConfigs["docker"], "master", "1.0.0", "1.0.0-1a2b3c", nil},
 }
 
-func TestCalculateSemanticVersion(t *testing.T) {
+func TestMkver(t *testing.T) {
 	// prepare
 	execCommand = fakeExecCommand
 	defer func() { execCommand = exec.Command }()
@@ -90,6 +116,6 @@ func TestCalculateSemanticVersion(t *testing.T) {
 	// execute
 	for _, test := range tests {
 		got, _ := Calculate(test.config, test.branch, test.version)
-		assert.Equal(t, test.expected, got)
+		assert.Equal(t, test.expected, got, "failed while testing "+test.name)
 	}
 }
